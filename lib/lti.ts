@@ -1,6 +1,8 @@
 import { Provider as lti } from 'ltijs';
 import Database from 'ltijs-sequelize';
 
+export { lti };
+
 /**
  * ltijs (LTI 1.3) u serverless modu, sa Postgres backendom (Supabase pooler).
  * Sve ltijs sistemske tabele idu u schema `anki_lti` (izolacija u deljenom projektu).
