@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/identity';
+import { cookies } from 'next/headers';
+import { resolveUser } from '@/lib/identity';
 import { submitReview } from '@/lib/cards';
 import { RATING } from '@/lib/fsrs';
+import { SESSION_COOKIE } from '@/lib/session';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** POST /api/review — body: { cardId, rating: 'again'|'hard'|'good'|'easy' }. */
+/** POST /api/review — body: { cardId, rating }. Identitet iz session kolačića. */
 export async function POST(req: Request) {
   let body: { cardId?: number; rating?: string };
   try {
@@ -19,11 +21,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Neispravan zahtev' }, { status: 400 });
   }
   try {
-    const user = await getCurrentUser();
+    const token = (await cookies()).get(SESSION_COOKIE)?.value;
+    const user = await resolveUser(token);
     const r = await submitReview(user.userId, Number(cardId), RATING[rating as keyof typeof RATING]);
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : 'Greška';
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json({ error: e instanceof Error ? e.message : 'Greška' }, { status: 500 });
   }
 }

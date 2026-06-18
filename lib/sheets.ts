@@ -63,3 +63,21 @@ export async function getCardsFromSheet(): Promise<SheetCard[]> {
 
   return cards;
 }
+
+const SETTINGS_TAB = process.env.GOOGLE_SHEETS_SETTINGS_TAB ?? 'Settings';
+
+/** Cita `Settings` tab (key | value) -> mapa podešavanja. */
+export async function getSettingsFromSheet(): Promise<Record<string, string>> {
+  const sheets = sheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: SPREADSHEET_ID,
+    range: `${SETTINGS_TAB}!A2:B`,
+  });
+  const out: Record<string, string> = {};
+  for (const row of res.data.values ?? []) {
+    const key = (row[0] ?? '').toString().trim();
+    const value = (row[1] ?? '').toString().trim();
+    if (key) out[key] = value;
+  }
+  return out;
+}

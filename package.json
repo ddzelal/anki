@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "googleapis": "^173.0.0",
+    "jsonwebtoken": "^9.0.3",
     "ltijs": "^5.9.9",
     "ltijs-sequelize": "^2.4.4",
     "next": "16.2.9",
@@ -21,6 +22,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",

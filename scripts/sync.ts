@@ -7,7 +7,7 @@ import { pool } from '../lib/db';
 
 async function main() {
   const r = await runSync();
-  console.log(`anki_cards: ${r.cards} | grupa-tagova: ${r.groupTags}`);
+  console.log(`anki_cards: ${r.cards} | grupa-tagova: ${r.groupTags} | podešavanja: ${r.settings}`);
   await pool.end();
   console.log('Sync gotov.');
 }

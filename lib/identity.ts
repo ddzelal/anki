@@ -1,40 +1,40 @@
 import { pool } from './db';
+import { verifySession } from './session';
 
-/**
- * Ko je trenutni korisnik.
- * - DEV (lokalno, bez LTI): fiksni korisnik, bez filtracije po grupama.
- * - PRAVI (LTI launch): vidi upsertUserFromToken — token.user = Moodle `sub`.
- */
-const DEV_SUB = 'dev-local';
-
-export async function getCurrentUser(): Promise<{ userId: number; isDev: boolean }> {
-  const { rows } = await pool.query(
-    `insert into public.anki_users (moodle_sub, display_name)
-     values ($1, $2)
-     on conflict (moodle_sub) do update set display_name = excluded.display_name
-     returning id`,
-    [DEV_SUB, 'Dev (lokalno)'],
-  );
-  return { userId: rows[0].id as number, isDev: true };
+export interface ResolvedUser {
+  userId: number;
+  name: string | null;
+  groups: string[];
+  isDev: boolean;
+  isAdmin: boolean;
 }
 
 /**
- * Pravi LTI korisnik iz ltijs tokena: token.user = Moodle `sub` (stabilan po platformi).
- * Upsert u anki_users -> svaki student ima svoj red i svoj FSRS napredak.
+ * Identitet iz session kolačića (postavljen pri LTI launch-u).
+ * Nema kolačića / nevažeći -> DEV korisnik (lokalni test, vidi sve).
  */
-export async function upsertUserFromToken(token: {
-  user: string;
-  userInfo?: { name?: string; given_name?: string; email?: string };
-}): Promise<number> {
-  const sub = token.user;
-  const name = token.userInfo?.name ?? token.userInfo?.given_name ?? null;
+export async function resolveUser(sessionToken: string | undefined | null): Promise<ResolvedUser> {
+  const session = verifySession(sessionToken);
+
+  const sub = session?.sub ?? 'dev-local';
+  const name = session?.name ?? (session ? null : 'Dev (lokalno)');
+
   const { rows } = await pool.query(
     `insert into public.anki_users (moodle_sub, display_name)
      values ($1, $2)
      on conflict (moodle_sub)
      do update set display_name = coalesce(excluded.display_name, public.anki_users.display_name)
-     returning id`,
+     returning id, display_name`,
     [sub, name],
   );
-  return rows[0].id as number;
+
+  return {
+    userId: rows[0].id as number,
+    name: (rows[0].display_name as string | null) ?? name,
+    groups: session?.groups ?? [],
+    isDev: !session,
+    // pravi session -> njegov isAdmin; bez sesije -> admin SAMO u dev-u (lokalni test),
+    // nikad u produkciji (inače bi neprijavljeni posetilac mogao da pokrene sync).
+    isAdmin: session ? session.isAdmin : process.env.NODE_ENV !== 'production',
+  };
 }
