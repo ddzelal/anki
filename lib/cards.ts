@@ -11,26 +11,38 @@ export interface DueCard {
 }
 
 /**
- * Due kartice za korisnika: aktivne kartice iz dozvoljenih lekcija koje nemaju
- * review red (nove) ILI su dospele (due <= now). Nove idu posle dospelih.
+ * Due kartice za korisnika.
+ * @param groupFilter
+ *   - null  -> bez filtracije po grupama (sve aktivne kartice). Koristi se kad su grupe isključene.
+ *   - string[] -> samo kartice koje su (bez grupa-restrikcije) ILI taggovane jednom od ovih grupa.
+ *
+ * Kartica je vidljiva ako: is_active = true I (groupFilter null
+ *   ILI kartica nema ni jedan grupa-tag  ILI ima tag iz groupFilter-a).
+ * Nove ili dospele (due <= now).
  */
 export async function getDueCards(
   userId: number,
-  lessons: string[],
+  groupFilter: string[] | null,
   limit = 50,
 ): Promise<DueCard[]> {
-  if (lessons.length === 0) return [];
   const { rows } = await pool.query(
     `select c.id, c.front, c.back, c.lesson, (r.id is null) as is_new
      from public.anki_cards c
      left join public.anki_reviews r
        on r.card_id = c.id and r.user_id = $1
      where c.is_active = true
-       and c.lesson = any($2)
+       and (
+         $2::text[] is null
+         or not exists (select 1 from public.anki_card_groups g where g.card_id = c.id)
+         or exists (
+           select 1 from public.anki_card_groups g
+           where g.card_id = c.id and g.group_name = any($2)
+         )
+       )
        and (r.id is null or r.due <= now())
      order by (r.id is null) asc, r.due asc nulls last
      limit $3`,
-    [userId, lessons, limit],
+    [userId, groupFilter, limit],
   );
   return rows as DueCard[];
 }

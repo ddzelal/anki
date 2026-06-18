@@ -1,7 +1,44 @@
 import { Provider as lti } from 'ltijs';
 import Database from 'ltijs-sequelize';
+import { getDueCards, submitReview } from './cards';
+import { upsertUserFromToken } from './identity';
+import { RATING } from './fsrs';
 
 export { lti };
+
+const GROUPS_ENABLED = process.env.GROUPS_ENABLED === 'true';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+/**
+ * Moodle grupe korisnika preko NRPS-a. AKTIVNO tek kad GROUPS_ENABLED=true.
+ * Još neprovereno na ovom Moodle-u — verifikujemo kad uključimo grupe.
+ */
+async function getUserGroups(token: any): Promise<string[]> {
+  try {
+    const result: any = await lti.NamesAndRoles.getMembers(token);
+    const members: any[] = result?.members ?? [];
+    const me = members.find((m) => m.user_id === token.user);
+    const groups: any[] = me?.groups ?? me?.group_enrollments ?? [];
+    return groups
+      .map((g) => (typeof g === 'string' ? g : g.name ?? g.title))
+      .filter(Boolean);
+  } catch (e) {
+    console.error('NRPS getMembers nije uspeo:', e);
+    return [];
+  }
+}
+
+/**
+ * Filter grupa za getDueCards.
+ *  - flag off -> null (bez filtracije; sve aktivne kartice vidljive svima)
+ *  - flag on  -> grupe korisnika (per-reč filtracija). [] = nije ni u jednoj grupi
+ *               (vidi samo reči bez grupa-restrikcije).
+ */
+async function groupFilterForToken(token: any): Promise<string[] | null> {
+  if (!GROUPS_ENABLED) return null;
+  return getUserGroups(token);
+}
 
 /**
  * ltijs (LTI 1.3) u serverless modu, sa Postgres backendom (Supabase pooler).
@@ -63,6 +100,36 @@ export function getLtiApp() {
     });
 
     await lti.deploy({ serverless: true });
+
+    // ltik-zaštićene API rute (POSLE deploy-a -> iza ltijs sessionValidator-a,
+    // pa je res.locals.token validiran launch token). /study ih zove sa ?ltik=.
+    lti.app.get('/api/lti/cards/due', async (_req: any, res: any) => {
+      try {
+        const token = res.locals.token;
+        const userId = await upsertUserFromToken(token);
+        const groupFilter = await groupFilterForToken(token);
+        const cards = await getDueCards(userId, groupFilter);
+        res.json({ cards });
+      } catch (e) {
+        res.status(500).json({ error: e instanceof Error ? e.message : 'Greška' });
+      }
+    });
+
+    lti.app.post('/api/lti/review', async (req: any, res: any) => {
+      try {
+        const token = res.locals.token;
+        const { cardId, rating } = req.body ?? {};
+        if (!cardId || !rating || !(rating in RATING)) {
+          return res.status(400).json({ error: 'Neispravan zahtev' });
+        }
+        const userId = await upsertUserFromToken(token);
+        const r = await submitReview(userId, Number(cardId), RATING[rating as keyof typeof RATING]);
+        res.json({ ok: true, ...r });
+      } catch (e) {
+        res.status(500).json({ error: e instanceof Error ? e.message : 'Greška' });
+      }
+    });
+
     return lti.app;
   })();
 

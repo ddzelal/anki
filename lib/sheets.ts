@@ -15,31 +15,26 @@ function sheetsClient() {
 
 const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID!;
 const CARDS_TAB = process.env.GOOGLE_SHEETS_ACTIVE_TAB ?? 'CardsV2';
-const ACCESS_TAB = process.env.GOOGLE_SHEETS_ACCESS_TAB ?? 'Access';
 
 export interface SheetCard {
   front: string;
   back: string;
   lesson: string;
   isActive: boolean;
-}
-
-export interface AccessRow {
-  groupName: string;
-  lesson: string;
+  groups: string[]; // koje grupe smeju da je vide; prazno = sve grupe
 }
 
 /**
- * Cita CardsV2 (front | back | group | isActive).
- * VAZNO: sheet kolona "group" je zapravo LEKCIJA -> mapira se na lesson.
- * Obrnute kartice (npr. "Brat -> أَخٌ") imaju prazan group; naslede lekciju
- * od prethodnog reda (forward-fill), jer dolaze odmah iza svog parnjaka.
+ * Cita CardsV2: front | back | lesson | isActive | groups
+ * - kolona `lesson` (istorijski naziv "group") = sadržajna oznaka; prazan -> nasledi od parnjaka.
+ * - kolona `groups` = lista Moodle grupa (zarezom/; razdvojeno) koje smeju da vide reč;
+ *   prazno = vidljivo svim grupama.
  */
 export async function getCardsFromSheet(): Promise<SheetCard[]> {
   const sheets = sheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
-    range: `${CARDS_TAB}!A2:D`,
+    range: `${CARDS_TAB}!A2:E`,
   });
 
   const rows = res.data.values ?? [];
@@ -51,34 +46,20 @@ export async function getCardsFromSheet(): Promise<SheetCard[]> {
     const back = (row[1] ?? '').toString().trim();
     const rawLesson = (row[2] ?? '').toString().trim();
     const isActive = (row[3] ?? '').toString().trim().toUpperCase() !== 'FALSE';
+    const groups = (row[4] ?? '')
+      .toString()
+      .split(/[,;]/)
+      .map((g: string) => g.trim())
+      .filter(Boolean);
 
-    if (!front || !back) continue; // preskoci prazne redove
+    if (!front || !back) continue;
 
-    const lesson = rawLesson || lastLesson; // forward-fill za obrnute kartice
+    const lesson = rawLesson || lastLesson;
     if (rawLesson) lastLesson = rawLesson;
-    if (!lesson) continue; // nema lekcije ni za naslediti -> preskoci
+    if (!lesson) continue;
 
-    cards.push({ front, back, lesson, isActive });
+    cards.push({ front, back, lesson, isActive, groups });
   }
 
   return cards;
-}
-
-/** Cita Access (group | lesson) -> mapa Moodle grupa -> lekcija. */
-export async function getAccessFromSheet(): Promise<AccessRow[]> {
-  const sheets = sheetsClient();
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: SPREADSHEET_ID,
-    range: `${ACCESS_TAB}!A2:B`,
-  });
-
-  const rows = res.data.values ?? [];
-  const out: AccessRow[] = [];
-  for (const row of rows) {
-    const groupName = (row[0] ?? '').toString().trim();
-    const lesson = (row[1] ?? '').toString().trim();
-    if (!groupName || !lesson) continue;
-    out.push({ groupName, lesson });
-  }
-  return out;
 }

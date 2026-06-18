@@ -1,23 +1,13 @@
 import { pool } from './db';
 
 /**
- * Ko je trenutni korisnik i koje lekcije sme da vidi.
- *
- * FAZA 6 (TODO): čitati LTI sesiju (ltijs token) -> moodle_sub + Moodle grupa,
- * pa lekcije iz anki_group_access za tu grupu.
- *
- * Za sada: DEV korisnik (lokalno) koji vidi SVE lekcije — da možemo da testiramo
- * study tok pre Moodle integracije.
+ * Ko je trenutni korisnik.
+ * - DEV (lokalno, bez LTI): fiksni korisnik, bez filtracije po grupama.
+ * - PRAVI (LTI launch): vidi upsertUserFromToken — token.user = Moodle `sub`.
  */
 const DEV_SUB = 'dev-local';
 
-export interface CurrentUser {
-  userId: number;
-  lessons: string[];
-  isDev: boolean;
-}
-
-export async function getCurrentUser(): Promise<CurrentUser> {
+export async function getCurrentUser(): Promise<{ userId: number; isDev: boolean }> {
   const { rows } = await pool.query(
     `insert into public.anki_users (moodle_sub, display_name)
      values ($1, $2)
@@ -25,10 +15,26 @@ export async function getCurrentUser(): Promise<CurrentUser> {
      returning id`,
     [DEV_SUB, 'Dev (lokalno)'],
   );
-  const userId: number = rows[0].id;
+  return { userId: rows[0].id as number, isDev: true };
+}
 
-  const { rows: lrows } = await pool.query(
-    `select distinct lesson from public.anki_cards order by lesson`,
+/**
+ * Pravi LTI korisnik iz ltijs tokena: token.user = Moodle `sub` (stabilan po platformi).
+ * Upsert u anki_users -> svaki student ima svoj red i svoj FSRS napredak.
+ */
+export async function upsertUserFromToken(token: {
+  user: string;
+  userInfo?: { name?: string; given_name?: string; email?: string };
+}): Promise<number> {
+  const sub = token.user;
+  const name = token.userInfo?.name ?? token.userInfo?.given_name ?? null;
+  const { rows } = await pool.query(
+    `insert into public.anki_users (moodle_sub, display_name)
+     values ($1, $2)
+     on conflict (moodle_sub)
+     do update set display_name = coalesce(excluded.display_name, public.anki_users.display_name)
+     returning id`,
+    [sub, name],
   );
-  return { userId, lessons: lrows.map((r: { lesson: string }) => r.lesson), isDev: true };
+  return rows[0].id as number;
 }

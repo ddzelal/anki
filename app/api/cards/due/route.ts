@@ -9,7 +9,8 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const user = await getCurrentUser();
-    const cards = await getDueCards(user.userId, user.lessons);
+    // dev mod: bez filtracije po grupama (null) -> sve aktivne kartice
+    const cards = await getDueCards(user.userId, null);
     return NextResponse.json({ cards, dev: user.isDev });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Greška';

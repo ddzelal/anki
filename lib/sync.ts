@@ -1,38 +1,42 @@
-import { getCardsFromSheet, getAccessFromSheet } from './sheets';
+import { getCardsFromSheet } from './sheets';
 import { pool } from './db';
 
 /**
- * Prekopira sadržaj iz Google Sheet-a u Supabase (jedna transakcija).
+ * Prekopira kartice iz Google Sheet-a u Supabase (jedna transakcija).
  *   CardsV2 -> anki_cards (upsert po front+back+lesson)
- *   Access  -> anki_group_access (replace-all)
+ *           -> anki_card_groups (po-reč grupe; replace per kartica)
  * NE dira anki_users / anki_reviews (napredak studenata ostaje netaknut).
  * Koriste je i `pnpm sync` i POST /api/sync.
  */
-export async function runSync(): Promise<{ cards: number; access: number }> {
+export async function runSync(): Promise<{ cards: number; groupTags: number }> {
   const cards = await getCardsFromSheet();
-  const access = await getAccessFromSheet();
+  let groupTags = 0;
 
   const client = await pool.connect();
   try {
     await client.query('begin');
 
     for (const c of cards) {
-      await client.query(
+      const { rows } = await client.query(
         `insert into public.anki_cards (front, back, lesson, is_active)
          values ($1, $2, $3, $4)
          on conflict (front, back, lesson)
-         do update set is_active = excluded.is_active`,
+         do update set is_active = excluded.is_active
+         returning id`,
         [c.front, c.back, c.lesson, c.isActive],
       );
-    }
+      const cardId = rows[0].id as number;
 
-    await client.query('truncate public.anki_group_access');
-    for (const a of access) {
-      await client.query(
-        `insert into public.anki_group_access (group_name, lesson)
-         values ($1, $2) on conflict (group_name, lesson) do nothing`,
-        [a.groupName, a.lesson],
-      );
+      // Replace grupa-tagova za ovu karticu
+      await client.query('delete from public.anki_card_groups where card_id = $1', [cardId]);
+      for (const g of c.groups) {
+        await client.query(
+          `insert into public.anki_card_groups (card_id, group_name)
+           values ($1, $2) on conflict (card_id, group_name) do nothing`,
+          [cardId, g],
+        );
+        groupTags++;
+      }
     }
 
     await client.query('commit');
@@ -43,5 +47,5 @@ export async function runSync(): Promise<{ cards: number; access: number }> {
     client.release();
   }
 
-  return { cards: cards.length, access: access.length };
+  return { cards: cards.length, groupTags };
 }

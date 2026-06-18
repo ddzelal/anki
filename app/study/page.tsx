@@ -12,6 +12,22 @@ interface Card {
 
 type Rating = 'again' | 'hard' | 'good' | 'easy';
 
+/**
+ * Kad launch dolazi iz Moodle-a, ltik je u URL-u -> koristimo ltik-zaštićene rute
+ * (pravi identitet + grupe). Bez ltik-a (lokalni test) -> dev rute.
+ */
+function apiUrls() {
+  const ltik =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('ltik')
+      : null;
+  const q = ltik ? `?ltik=${encodeURIComponent(ltik)}` : '';
+  return {
+    due: ltik ? `/api/lti/cards/due${q}` : '/api/cards/due',
+    review: ltik ? `/api/lti/review${q}` : '/api/review',
+  };
+}
+
 const RATINGS: { key: Rating; label: string; cls: string }[] = [
   { key: 'again', label: 'Ponovo', cls: 'bg-rose-600 hover:bg-rose-500' },
   { key: 'hard', label: 'Teško', cls: 'bg-amber-600 hover:bg-amber-500' },
@@ -32,7 +48,7 @@ export default function StudyPage() {
     setError(null);
     setShowBack(false);
     try {
-      const res = await fetch('/api/cards/due');
+      const res = await fetch(apiUrls().due);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Greška');
       setQueue(data.cards);
@@ -53,7 +69,7 @@ export default function StudyPage() {
     if (!card || submitting) return;
     setSubmitting(true);
     try {
-      const res = await fetch('/api/review', {
+      const res = await fetch(apiUrls().review, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cardId: card.id, rating }),

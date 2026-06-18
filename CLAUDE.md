@@ -26,4 +26,7 @@ Project conventions for the Anki project. Read this before working with Google S
 
 ## Moodle
 
-- Instance: `https://learn.ulum.rs` (`NEXT_PUBLIC_MOODLE_URL`). LTI 1.3 platform; group membership read via NRPS.
+- Instance: `https://learn.ulum.rs` (`NEXT_PUBLIC_MOODLE_URL`). LTI 1.3 platform, registered (client `HwtO0SEjOBUdFAO`, deployment `1`). Launch flow: `/api/lti/login` (OIDC) → `/api/lti/launch` → 303 redirect to `/study?ltik=...`.
+- **Identity:** real per-student from the ltijs token (`token.user` = Moodle `sub`) → `anki_users` (own FSRS progress). The ltik-protected API routes `GET /api/lti/cards/due` and `POST /api/lti/review` (registered inside the ltijs Express app, after `lti.deploy`, so they sit behind ltijs sessionValidator) use it. `/study` sends the ltik (`?ltik=`); without a ltik it falls back to the dev routes `/api/cards/due` + `/api/review` for local testing.
+- **Groups behind a flag** `GROUPS_ENABLED` (default false). False = everyone sees all lessons (groups ignored). True = NRPS → Moodle group → lessons via `anki_group_access`. Flip to true (env var) once students are assigned to groups and NRPS is verified to return group info on this Moodle. Real group name: `arapski_jezik_decembar_2025`.
+- The Next.js↔ltijs bridge (`pages/api/lti/[...path].ts`) must `delete req.cookies` (Next pre-populates it, which makes cookie-parser skip and never set `req.secret` → signed-cookie failure).

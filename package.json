@@ -7,8 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "sync": "tsx --env-file=.env.local scripts/sync.ts",
-    "dump-sql": "tsx --env-file=.env.local scripts/dump-sql.ts"
+    "sync": "tsx --env-file=.env.local scripts/sync.ts"
   },
   "dependencies": {
     "googleapis": "^173.0.0",
