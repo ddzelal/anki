@@ -53,10 +53,13 @@ export function getLtiApp() {
       },
     );
 
-    // Glavni launch: korisnik je verifikovan -> redirect na frontend view.
-    // token.userInfo / token.platformContext (kurs, role); grupe preko NRPS-a (Faza 6).
-    lti.onConnect(async (token: unknown, req: unknown, res: unknown) => {
-      return lti.redirect(res, '/study', { newResource: true });
+    // Glavni launch: korisnik je verifikovan -> redirect na /study.
+    // Moodle radi POST launch; mora 303 (See Other) da browser uradi GET na /study
+    // (App Router stranica prima samo GET; 302 je u serverless bridge-u zadržavao POST -> 405).
+    // ltik ide u URL za kasniju NRPS autentikaciju API poziva (Faza 6).
+    lti.onConnect(async (_token: unknown, _req: unknown, res: { locals?: { ltik?: string }; redirect: (s: number, u: string) => unknown }) => {
+      const ltik = res.locals?.ltik ?? '';
+      return res.redirect(303, `/study?ltik=${encodeURIComponent(ltik)}`);
     });
 
     await lti.deploy({ serverless: true });
