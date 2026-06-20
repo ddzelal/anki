@@ -11,26 +11,71 @@ const RESOLVE_GROUPS = GROUPS_ENABLED || GROUPS_DEBUG;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-/** Izvuci nazive grupa iz jednog NRPS member objekta (razni Moodle oblici). */
-function memberGroupNames(m: any): string[] {
-  const groups: any[] = m?.groups ?? m?.group_enrollments ?? [];
-  return groups.map((g) => (typeof g === 'string' ? g : g.name ?? g.title ?? g.id)).filter(Boolean);
-}
-
 /**
  * Grupe iz NRPS-a. Vraća { mine, all }:
- *   mine = grupe TRENUTNOG korisnika; all = sve različite grupe u kursu (za dijagnostiku).
- * AKTIVNO tek kad RESOLVE_GROUPS. Još neprovereno na ovom Moodle-u — zato i dijagnostic.
+ *   mine = grupe TRENUTNOG korisnika; all = sve grupe u kontekstu (za dijagnostiku).
+ *
+ * VAŽNO: Moodle uključuje grupe u NRPS odgovor SAMO ako se traži `?groups=true`.
+ * Tada su definicije grupa u top-level `groups` nizu (id+name), a svaki član ima
+ * `group_enrollments` sa `group_id` (referenca na te definicije) — NE ime direktno.
  */
 async function getGroups(token: any): Promise<{ mine: string[]; all: string[] }> {
   try {
-    const result: any = await lti.NamesAndRoles.getMembers(token);
+    const base: string | undefined = token?.platformContext?.namesRoles?.context_memberships_url;
+    if (!base) {
+      if (GROUPS_DEBUG) console.log('[GROUPS_DEBUG] nema namesRoles.context_memberships_url u tokenu');
+      return { mine: [], all: [] };
+    }
+    // Eksplicitno traži grupe (Moodle ext). options.url -> ltijs gađa baš ovaj URL.
+    const url = base + (base.includes('?') ? '&' : '?') + 'groups=true';
+    const result: any = await lti.NamesAndRoles.getMembers(token, { url, pages: false });
+
     const members: any[] = result?.members ?? [];
+    const groupDefs: any[] = result?.groups ?? []; // top-level definicije {id, name}
+    const idToName = new Map<string, string>(
+      groupDefs.map((g) => [String(g.id), g.name ?? g.title ?? String(g.id)]),
+    );
+
+    // Nazivi grupa jednog člana: preko group_enrollments (group_id) -> ime, uz fallback na inline.
+    const namesOf = (m: any): string[] => {
+      const enr: any[] = m?.group_enrollments ?? m?.groups ?? [];
+      return enr
+        .map((x) => {
+          if (typeof x === 'string') return idToName.get(x) ?? x;
+          const id = x.group_id ?? x.id;
+          return idToName.get(String(id)) ?? x.name ?? x.title ?? (id != null ? String(id) : '');
+        })
+        .filter(Boolean);
+    };
+
     const me = members.find((m) => m.user_id === token.user);
-    const mine = me ? memberGroupNames(me) : [];
-    const all = [...new Set(members.flatMap(memberGroupNames))].sort();
+    const mine = me ? namesOf(me) : [];
+    // "Sve grupe" = top-level definicije ako postoje, inače unija po članovima.
+    const all = (
+      groupDefs.length
+        ? groupDefs.map((g) => g.name ?? g.title ?? String(g.id))
+        : [...new Set(members.flatMap(namesOf))]
+    )
+      .filter(Boolean)
+      .sort();
+
     if (GROUPS_DEBUG) {
-      console.log('[GROUPS_DEBUG] članova:', members.length, '| moje grupe:', mine, '| sve grupe:', all);
+      console.log(
+        '[GROUPS_DEBUG] članova:',
+        members.length,
+        '| group defs:',
+        groupDefs.length,
+        '| moje grupe:',
+        mine,
+        '| sve grupe:',
+        all,
+      );
+      if (members.length && !groupDefs.length) {
+        console.log(
+          '[GROUPS_DEBUG] članovi stigli ali bez grupa — primer ključeva člana:',
+          Object.keys(members[0] ?? {}),
+        );
+      }
     }
     return { mine, all };
   } catch (e) {
