@@ -9,8 +9,9 @@ export const SESSION_COOKIE = 'anki_session';
 export interface Session {
   sub: string; // Moodle user id (stabilan)
   name: string | null;
-  groups: string[]; // Moodle grupe (prazno ako grupe nisu uključene/poznate)
+  groups: string[]; // Moodle grupe ovog korisnika (prazno ako grupe nisu uključene/poznate)
   isAdmin: boolean; // instruktor/admin u Moodle-u
+  allGroups?: string[]; // SVE grupe u kursu (dijagnostika; popunjeno samo za admina kad je debug/grupe upaljeno)
 }
 
 const SECRET = () => process.env.LTI_KEY ?? '';
@@ -28,6 +29,7 @@ export function verifySession(token: string | undefined | null): Session | null 
       name: p.name ?? null,
       groups: Array.isArray(p.groups) ? p.groups : [],
       isAdmin: !!p.isAdmin,
+      allGroups: Array.isArray(p.allGroups) ? p.allGroups : undefined,
     };
   } catch {
     return null;

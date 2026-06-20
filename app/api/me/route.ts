@@ -10,5 +10,11 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const user = await resolveUser(token);
-  return NextResponse.json({ name: user.name, isAdmin: user.isAdmin, dev: user.isDev });
+  return NextResponse.json({
+    name: user.name,
+    isAdmin: user.isAdmin,
+    dev: user.isDev,
+    groups: user.groups,
+    allGroups: user.allGroups ?? null,
+  });
 }

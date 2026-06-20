@@ -24,33 +24,46 @@ export interface SheetCard {
   groups: string[]; // koje grupe smeju da je vide; prazno = sve grupe
 }
 
+const TRUE_RE = /^(true|1|x|✓|da|yes)$/i;
+
 /**
- * Cita CardsV2: front | back | lesson | isActive | groups
- * - kolona `lesson` (istorijski naziv "group") = sadržajna oznaka; prazan -> nasledi od parnjaka.
- * - kolona `groups` = lista Moodle grupa (zarezom/; razdvojeno) koje smeju da vide reč;
- *   prazno = vidljivo svim grupama.
+ * Cita CardsV2: front | back | lesson | isActive | <grupa1> | <grupa2> | ...
+ * - kolona `lesson` = sadržajna oznaka; prazan -> nasledi od prethodnog reda.
+ * - kolona `isActive` (D): TRUE/prazno = aktivna; FALSE = sakrivena svima.
+ * - od kolone E nadalje: SVAKA kolona je jedna Moodle grupa (ime grupe je u zaglavlju,
+ *   red 1). Checkbox/TRUE u toj koloni = reč je vidljiva toj grupi.
+ *   Nijedan TRUE u nizu grupa = reč je vidljiva SVIM grupama (bez restrikcije).
+ *   Ime grupe (zaglavlje) mora tačno da se poklopi sa Moodle NRPS imenom grupe.
  */
 export async function getCardsFromSheet(): Promise<SheetCard[]> {
   const sheets = sheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
-    range: `${CARDS_TAB}!A2:E`,
+    range: `${CARDS_TAB}!A1:Z`,
   });
 
   const rows = res.data.values ?? [];
+  if (rows.length === 0) return [];
+
+  // Zaglavlje: kolone od indeksa 4 (E) naviše čije ime nije prazno = grupne kolone.
+  const header = rows[0];
+  const groupCols: { idx: number; name: string }[] = [];
+  for (let i = 4; i < header.length; i++) {
+    const name = (header[i] ?? '').toString().trim();
+    if (name) groupCols.push({ idx: i, name });
+  }
+
   const cards: SheetCard[] = [];
   let lastLesson = '';
 
-  for (const row of rows) {
+  for (const row of rows.slice(1)) {
     const front = (row[0] ?? '').toString().trim();
     const back = (row[1] ?? '').toString().trim();
     const rawLesson = (row[2] ?? '').toString().trim();
     const isActive = (row[3] ?? '').toString().trim().toUpperCase() !== 'FALSE';
-    const groups = (row[4] ?? '')
-      .toString()
-      .split(/[,;]/)
-      .map((g: string) => g.trim())
-      .filter(Boolean);
+    const groups = groupCols
+      .filter(({ idx }) => TRUE_RE.test((row[idx] ?? '').toString().trim()))
+      .map(({ name }) => name);
 
     if (!front || !back) continue;
 

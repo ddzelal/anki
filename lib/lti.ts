@@ -5,25 +5,37 @@ import { signSession } from './session';
 export { lti };
 
 const GROUPS_ENABLED = process.env.GROUPS_ENABLED === 'true';
+const GROUPS_DEBUG = process.env.GROUPS_DEBUG === 'true';
+// Resolve-uj grupe i kad je filter upaljen i kad je samo dijagnostika.
+const RESOLVE_GROUPS = GROUPS_ENABLED || GROUPS_DEBUG;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+/** Izvuci nazive grupa iz jednog NRPS member objekta (razni Moodle oblici). */
+function memberGroupNames(m: any): string[] {
+  const groups: any[] = m?.groups ?? m?.group_enrollments ?? [];
+  return groups.map((g) => (typeof g === 'string' ? g : g.name ?? g.title ?? g.id)).filter(Boolean);
+}
+
 /**
- * Moodle grupe korisnika preko NRPS-a. AKTIVNO tek kad GROUPS_ENABLED=true.
- * Još neprovereno na ovom Moodle-u — verifikujemo kad uključimo grupe.
+ * Grupe iz NRPS-a. Vraća { mine, all }:
+ *   mine = grupe TRENUTNOG korisnika; all = sve različite grupe u kursu (za dijagnostiku).
+ * AKTIVNO tek kad RESOLVE_GROUPS. Još neprovereno na ovom Moodle-u — zato i dijagnostic.
  */
-async function getUserGroups(token: any): Promise<string[]> {
+async function getGroups(token: any): Promise<{ mine: string[]; all: string[] }> {
   try {
     const result: any = await lti.NamesAndRoles.getMembers(token);
     const members: any[] = result?.members ?? [];
     const me = members.find((m) => m.user_id === token.user);
-    const groups: any[] = me?.groups ?? me?.group_enrollments ?? [];
-    return groups
-      .map((g) => (typeof g === 'string' ? g : g.name ?? g.title))
-      .filter(Boolean);
+    const mine = me ? memberGroupNames(me) : [];
+    const all = [...new Set(members.flatMap(memberGroupNames))].sort();
+    if (GROUPS_DEBUG) {
+      console.log('[GROUPS_DEBUG] članova:', members.length, '| moje grupe:', mine, '| sve grupe:', all);
+    }
+    return { mine, all };
   } catch (e) {
     console.error('NRPS getMembers nije uspeo:', e);
-    return [];
+    return { mine: [], all: [] };
   }
 }
 
@@ -71,8 +83,6 @@ export function getLtiApp() {
     lti.onConnect(async (token: any, _req: unknown, res: any) => {
       const sub: string = token.user;
       const name: string | null = token.userInfo?.name ?? token.userInfo?.given_name ?? null;
-      let groups: string[] = [];
-      if (GROUPS_ENABLED) groups = await getUserGroups(token);
 
       // Admin = instruktor/administrator/menadžer u Moodle-u (LTI role claim).
       const roles: string[] = token.platformContext?.roles ?? token.roles ?? [];
@@ -80,7 +90,16 @@ export function getLtiApp() {
         /instructor|administrator|manager|contentdeveloper/i.test(String(r)),
       );
 
-      const session = signSession({ sub, name, groups, isAdmin });
+      let groups: string[] = [];
+      let allGroups: string[] | undefined;
+      if (RESOLVE_GROUPS) {
+        const g = await getGroups(token);
+        groups = g.mine;
+        // listu svih grupa kursa nosimo samo adminu (za dijagnostiku u /admin)
+        if (isAdmin) allGroups = g.all;
+      }
+
+      const session = signSession({ sub, name, groups, isAdmin, allGroups });
       res.cookie('anki_session', session, {
         httpOnly: true,
         secure: true,

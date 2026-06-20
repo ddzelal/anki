@@ -2,19 +2,34 @@
 
 import { useEffect, useState } from 'react';
 
+interface Me {
+  name: string | null;
+  isAdmin: boolean;
+  groups: string[];
+  allGroups: string[] | null;
+}
+
 export default function AdminPage() {
-  const [me, setMe] = useState<{ name: string | null; isAdmin: boolean } | null>(null);
-  const [secret, setSecret] = useState('');
+  const [me, setMe] = useState<Me | null>(null);
+  const [secret, setSecret] = useState(() =>
+    typeof window !== 'undefined' ? localStorage.getItem('sync_secret') ?? '' : '',
+  );
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setSecret(localStorage.getItem('sync_secret') ?? '');
     fetch('/api/me')
       .then((r) => r.json())
-      .then((d) => setMe({ name: d.name ?? null, isAdmin: Boolean(d.isAdmin) }))
-      .catch(() => setMe({ name: null, isAdmin: false }));
+      .then((d) =>
+        setMe({
+          name: d.name ?? null,
+          isAdmin: Boolean(d.isAdmin),
+          groups: Array.isArray(d.groups) ? d.groups : [],
+          allGroups: Array.isArray(d.allGroups) ? d.allGroups : null,
+        }),
+      )
+      .catch(() => setMe({ name: null, isAdmin: false, groups: [], allGroups: null }));
   }, []);
 
   const isAdmin = me?.isAdmin ?? false;
@@ -91,6 +106,53 @@ export default function AdminPage() {
           {result && <p className="mt-4 text-ulum-green-dark text-sm">{result}</p>}
           {error && <p className="mt-4 text-ulum-pink text-sm">{error}</p>}
         </div>
+
+        {me?.allGroups && (
+          <div className="rounded-2xl bg-white shadow-sm p-6 mt-4">
+            <h2 className="text-sm font-semibold text-ulum-blue mb-1">
+              Moodle grupe (dijagnostika)
+            </h2>
+            <p className="text-xs text-ulum-ink/50 mb-4">
+              Ovo su tačni nazivi grupa kako ih Moodle šalje. Iskopiraj ih 1:1 u zaglavlja
+              grupnih kolona (E, F…) u CardsV2 da bi filtriranje radilo.
+            </p>
+
+            <div className="text-xs font-medium text-ulum-ink/60 mb-1">Sve grupe u kursu</div>
+            {me.allGroups.length === 0 ? (
+              <p className="text-sm text-ulum-pink mb-3">
+                Moodle NRPS nije vratio nijednu grupu (prazna lista). Proveri da li su studenti
+                stvarno u grupama i da NRPS dozvoljava grupe.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {me.allGroups.map((g) => (
+                  <code
+                    key={g}
+                    className="text-[12px] px-2 py-1 rounded-md bg-ulum-paper border border-ulum-cream text-ulum-ink select-all"
+                  >
+                    {g}
+                  </code>
+                ))}
+              </div>
+            )}
+
+            <div className="text-xs font-medium text-ulum-ink/60 mb-1">Tvoje grupe</div>
+            <div className="flex flex-wrap gap-1.5">
+              {me.groups.length === 0 ? (
+                <span className="text-sm text-ulum-ink/50">— (nisi član nijedne grupe)</span>
+              ) : (
+                me.groups.map((g) => (
+                  <code
+                    key={g}
+                    className="text-[12px] px-2 py-1 rounded-md bg-ulum-green/10 border border-ulum-green/30 text-ulum-green-dark select-all"
+                  >
+                    {g}
+                  </code>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         <p className="text-ulum-ink/40 text-xs mt-4">
           Sync prepisuje kartice i podešavanja iz Sheet-a; napredak studenata ostaje netaknut.

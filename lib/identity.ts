@@ -5,6 +5,7 @@ export interface ResolvedUser {
   userId: number;
   name: string | null;
   groups: string[];
+  allGroups?: string[]; // sve grupe kursa (dijagnostika, samo admin)
   isDev: boolean;
   isAdmin: boolean;
 }
@@ -32,6 +33,7 @@ export async function resolveUser(sessionToken: string | undefined | null): Prom
     userId: rows[0].id as number,
     name: (rows[0].display_name as string | null) ?? name,
     groups: session?.groups ?? [],
+    allGroups: session?.allGroups,
     isDev: !session,
     // pravi session -> njegov isAdmin; bez sesije -> admin SAMO u dev-u (lokalni test),
     // nikad u produkciji (inače bi neprijavljeni posetilac mogao da pokrene sync).
