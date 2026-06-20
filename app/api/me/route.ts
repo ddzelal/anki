@@ -10,11 +10,14 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   const user = await resolveUser(token);
+  const groupsDebug =
+    process.env.GROUPS_DEBUG === 'true' || process.env.GROUPS_ENABLED === 'true';
   return NextResponse.json({
     name: user.name,
     isAdmin: user.isAdmin,
     dev: user.isDev,
     groups: user.groups,
-    allGroups: user.allGroups ?? null,
+    groupsRaw: user.groupsRaw ?? null,
+    groupsDebug,
   });
 }

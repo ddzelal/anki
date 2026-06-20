@@ -27,13 +27,23 @@ export interface SheetCard {
 const TRUE_RE = /^(true|1|x|✓|da|yes)$/i;
 
 /**
+ * Ključ grupe iz zaglavlja kolone. Format `Ime (ID)` -> ključ je ID (to Moodle šalje
+ * kroz `$Moodle.Person.userGroupIds`). Ako nema `(ID)`, ključ je celo zaglavlje (fallback).
+ *   "arapski_jezik_decembar_2025 (7)" -> "7"
+ *   "arapski_jezik_decembar_2025"     -> "arapski_jezik_decembar_2025"
+ */
+function groupKeyFromHeader(header: string): string {
+  const m = header.match(/\(([^()]+)\)\s*$/);
+  return (m ? m[1] : header).trim();
+}
+
+/**
  * Cita CardsV2: front | back | lesson | isActive | <grupa1> | <grupa2> | ...
  * - kolona `lesson` = sadržajna oznaka; prazan -> nasledi od prethodnog reda.
  * - kolona `isActive` (D): TRUE/prazno = aktivna; FALSE = sakrivena svima.
- * - od kolone E nadalje: SVAKA kolona je jedna Moodle grupa (ime grupe je u zaglavlju,
- *   red 1). Checkbox/TRUE u toj koloni = reč je vidljiva toj grupi.
- *   Nijedan TRUE u nizu grupa = reč je vidljiva SVIM grupama (bez restrikcije).
- *   Ime grupe (zaglavlje) mora tačno da se poklopi sa Moodle NRPS imenom grupe.
+ * - od kolone E nadalje: SVAKA kolona je jedna Moodle grupa. Zaglavlje je `Ime (ID)`;
+ *   ID se poklapa sa onim što Moodle šalje (custom param userGroupIds). Checkbox/TRUE u
+ *   koloni = reč je vidljiva toj grupi. Nijedan TRUE = reč je vidljiva SVIMA (bez restrikcije).
  */
 export async function getCardsFromSheet(): Promise<SheetCard[]> {
   const sheets = sheetsClient();
@@ -47,10 +57,10 @@ export async function getCardsFromSheet(): Promise<SheetCard[]> {
 
   // Zaglavlje: kolone od indeksa 4 (E) naviše čije ime nije prazno = grupne kolone.
   const header = rows[0];
-  const groupCols: { idx: number; name: string }[] = [];
+  const groupCols: { idx: number; key: string }[] = [];
   for (let i = 4; i < header.length; i++) {
     const name = (header[i] ?? '').toString().trim();
-    if (name) groupCols.push({ idx: i, name });
+    if (name) groupCols.push({ idx: i, key: groupKeyFromHeader(name) });
   }
 
   const cards: SheetCard[] = [];
@@ -63,7 +73,7 @@ export async function getCardsFromSheet(): Promise<SheetCard[]> {
     const isActive = (row[3] ?? '').toString().trim().toUpperCase() !== 'FALSE';
     const groups = groupCols
       .filter(({ idx }) => TRUE_RE.test((row[idx] ?? '').toString().trim()))
-      .map(({ name }) => name);
+      .map(({ key }) => key);
 
     if (!front || !back) continue;
 
