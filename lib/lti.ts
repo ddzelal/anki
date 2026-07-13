@@ -1,6 +1,7 @@
 import { Provider as lti } from 'ltijs';
 import Database from 'ltijs-sequelize';
 import { signSession } from './session';
+import { fetchUserCourseGroups, courseIdFromToken } from './moodle';
 
 export { lti };
 
@@ -82,13 +83,29 @@ export function getLtiApp() {
         /instructor|administrator|manager|contentdeveloper/i.test(String(r)),
       );
 
-      let groups: string[] = []; // ID-evi Moodle grupa studenta (iz custom parametra)
-      let groupsRaw: string | undefined; // original vrednost (dijagnostika)
+      let groups: string[] = []; // grupe studenta: ID-evi I IMENA (matchujemo po oba)
+      let groupsRaw: string | undefined; // dijagnostika (izvor + vrednost)
       let customDebug: string | undefined; // ceo custom claim (dijagnostika)
       if (RESOLVE_GROUPS) {
-        const g = getGroupsFromCustom(token);
-        groups = g.ids;
-        groupsRaw = g.raw;
+        // 1) Web Services (pouzdano, daje IMENA) — ako je MOODLE_WS_TOKEN podešen.
+        const courseId = courseIdFromToken(token);
+        if (process.env.MOODLE_WS_TOKEN && courseId && sub) {
+          const mg = await fetchUserCourseGroups(courseId, sub);
+          if (mg.length) {
+            // Student.groups sadrži i ID-eve i imena -> zaglavlje u Sheet-u
+            // može biti "Ime" ILI "Ime (ID)" — oba se poklapaju.
+            groups = [...mg.map((g) => String(g.id)), ...mg.map((g) => g.name)];
+            groupsRaw = `ws(course ${courseId}): ${mg.map((g) => `${g.name}(${g.id})`).join(', ')}`;
+          } else {
+            groupsRaw = `ws(course ${courseId}): (nijedna grupa)`;
+          }
+        }
+        // 2) Fallback: custom param groupids (ako WS nije podešen ili nije dao ništa).
+        if (groups.length === 0) {
+          const g = getGroupsFromCustom(token);
+          groups = g.ids;
+          groupsRaw = groupsRaw ? `${groupsRaw} | custom: ${JSON.stringify(g.raw)}` : g.raw;
+        }
       }
       if (GROUPS_DEBUG) {
         // Ispiši TAČNO šta je stiglo: ceo custom objekat + koji ključevi postoje u
