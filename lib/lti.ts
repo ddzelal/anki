@@ -84,13 +84,25 @@ export function getLtiApp() {
 
       let groups: string[] = []; // ID-evi Moodle grupa studenta (iz custom parametra)
       let groupsRaw: string | undefined; // original vrednost (dijagnostika)
+      let customDebug: string | undefined; // ceo custom claim (dijagnostika)
       if (RESOLVE_GROUPS) {
         const g = getGroupsFromCustom(token);
         groups = g.ids;
         groupsRaw = g.raw;
       }
+      if (GROUPS_DEBUG) {
+        // Ispiši TAČNO šta je stiglo: ceo custom objekat + koji ključevi postoje u
+        // platformContext-u (da vidimo šalje li Moodle custom uopšte i pod kojim imenom).
+        const pc: any = token?.platformContext ?? {};
+        customDebug = JSON.stringify({
+          custom: pc.custom ?? null,
+          customKeys: Object.keys(pc.custom ?? {}),
+          platformContextKeys: Object.keys(pc),
+        });
+        console.log('[GROUPS_DEBUG] customDebug:', customDebug);
+      }
 
-      const session = signSession({ sub, name, groups, isAdmin, groupsRaw });
+      const session = signSession({ sub, name, groups, isAdmin, groupsRaw, customDebug });
       res.cookie('anki_session', session, {
         httpOnly: true,
         secure: true,

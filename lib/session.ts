@@ -12,6 +12,7 @@ export interface Session {
   groups: string[]; // ID-evi Moodle grupa ovog korisnika (iz custom parametra; prazno ako nije uključeno)
   isAdmin: boolean; // instruktor/admin u Moodle-u
   groupsRaw?: string; // originalna vrednost custom parametra groupids (dijagnostika)
+  customDebug?: string; // ceo custom claim + kljucevi platformContext-a (dijagnostika, GROUPS_DEBUG)
 }
 
 const SECRET = () => process.env.LTI_KEY ?? '';
@@ -30,6 +31,7 @@ export function verifySession(token: string | undefined | null): Session | null 
       groups: Array.isArray(p.groups) ? p.groups : [],
       isAdmin: !!p.isAdmin,
       groupsRaw: typeof p.groupsRaw === 'string' ? p.groupsRaw : undefined,
+      customDebug: typeof p.customDebug === 'string' ? p.customDebug : undefined,
     };
   } catch {
     return null;

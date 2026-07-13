@@ -6,6 +6,7 @@ export interface ResolvedUser {
   name: string | null;
   groups: string[]; // ID-evi Moodle grupa studenta
   groupsRaw?: string; // original custom param (dijagnostika)
+  customDebug?: string; // ceo custom claim (dijagnostika)
   isDev: boolean;
   isAdmin: boolean;
 }
@@ -34,6 +35,7 @@ export async function resolveUser(sessionToken: string | undefined | null): Prom
     name: (rows[0].display_name as string | null) ?? name,
     groups: session?.groups ?? [],
     groupsRaw: session?.groupsRaw,
+    customDebug: session?.customDebug,
     isDev: !session,
     // pravi session -> njegov isAdmin; bez sesije -> admin SAMO u dev-u (lokalni test),
     // nikad u produkciji (inače bi neprijavljeni posetilac mogao da pokrene sync).

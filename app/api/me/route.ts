@@ -18,6 +18,7 @@ export async function GET() {
     dev: user.isDev,
     groups: user.groups,
     groupsRaw: user.groupsRaw ?? null,
+    customDebug: user.customDebug ?? null,
     groupsDebug,
   });
 }

@@ -7,6 +7,7 @@ interface Me {
   isAdmin: boolean;
   groups: string[];
   groupsRaw: string | null;
+  customDebug: string | null;
   groupsDebug: boolean;
 }
 
@@ -25,11 +26,19 @@ export default function AdminPage() {
           isAdmin: Boolean(d.isAdmin),
           groups: Array.isArray(d.groups) ? d.groups : [],
           groupsRaw: typeof d.groupsRaw === 'string' ? d.groupsRaw : null,
+          customDebug: typeof d.customDebug === 'string' ? d.customDebug : null,
           groupsDebug: Boolean(d.groupsDebug),
         }),
       )
       .catch(() =>
-        setMe({ name: null, isAdmin: false, groups: [], groupsRaw: null, groupsDebug: false }),
+        setMe({
+          name: null,
+          isAdmin: false,
+          groups: [],
+          groupsRaw: null,
+          customDebug: null,
+          groupsDebug: false,
+        }),
       );
   }, []);
 
@@ -128,6 +137,17 @@ export default function AdminPage() {
                 ))
               )}
             </div>
+
+            <div className="text-xs font-medium text-ulum-ink/60 mt-4 mb-1">
+              Ceo LTI <code className="px-1 rounded bg-ulum-paper">custom</code> claim (sirovo)
+            </div>
+            <p className="text-[11px] text-ulum-ink/50 mb-1">
+              Ovo je tačno šta Moodle šalje. Ako je <code>custom</code> prazan ili nema{' '}
+              <code>groupids</code>, Moodle ne substituiše promenljivu → rešenje su Web Services.
+            </p>
+            <code className="block text-[11px] whitespace-pre-wrap break-all px-2 py-1.5 rounded-md bg-ulum-paper border border-ulum-cream text-ulum-ink select-all">
+              {me.customDebug ?? '— (nema; napravi svež launch iz Moodle-a dok je GROUPS_DEBUG=true)'}
+            </code>
           </div>
         )}
 
