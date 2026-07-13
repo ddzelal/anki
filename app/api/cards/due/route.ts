@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { resolveUser } from '@/lib/identity';
-import { getDueCards, getStats, getLessonProgress } from '@/lib/cards';
-import { getNewPerDay } from '@/lib/settings';
+import { buildStudy } from '@/lib/cards';
+import { getDeck, filterVisible } from '@/lib/sheets';
+import { newPerDay } from '@/lib/settings';
 import { SESSION_COOKIE } from '@/lib/session';
 
 export const runtime = 'nodejs';
@@ -10,24 +11,25 @@ export const dynamic = 'force-dynamic';
 
 const GROUPS_ENABLED = process.env.GROUPS_ENABLED === 'true';
 
-/** GET /api/cards/due — kartice + progres + napredak po lekciji. Identitet iz kolačića. */
-export async function GET() {
+/**
+ * GET /api/cards/due — kartice + progres + napredak po lekciji.
+ * Reči se čitaju UŽIVO iz Google Sheet-a (keširano ~5min); ?fresh=1 probije keš.
+ * Identitet iz session kolačića; grupno filtriranje u JS-u.
+ */
+export async function GET(req: Request) {
   try {
+    const fresh = new URL(req.url).searchParams.get('fresh') === '1';
     const token = (await cookies()).get(SESSION_COOKIE)?.value;
     const user = await resolveUser(token);
-    const groupFilter = GROUPS_ENABLED && !user.isDev ? user.groups : null;
-    const newPerDay = await getNewPerDay();
 
-    const [cards, stats, lessons] = await Promise.all([
-      getDueCards(user.userId, groupFilter, newPerDay),
-      getStats(user.userId, groupFilter, newPerDay),
-      getLessonProgress(user.userId, groupFilter),
-    ]);
+    const deck = await getDeck(fresh);
+    const groupFilter = GROUPS_ENABLED && !user.isDev ? user.groups : null;
+    const visible = filterVisible(deck.cards, groupFilter);
+
+    const study = await buildStudy(user.userId, visible, newPerDay(deck.settings));
 
     return NextResponse.json({
-      cards,
-      stats,
-      lessons,
+      ...study,
       name: user.name,
       dev: user.isDev,
       isAdmin: user.isAdmin,

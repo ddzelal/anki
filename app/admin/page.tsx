@@ -12,9 +12,6 @@ interface Me {
 
 export default function AdminPage() {
   const [me, setMe] = useState<Me | null>(null);
-  const [secret, setSecret] = useState(() =>
-    typeof window !== 'undefined' ? localStorage.getItem('sync_secret') ?? '' : '',
-  );
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,24 +33,16 @@ export default function AdminPage() {
       );
   }, []);
 
-  const isAdmin = me?.isAdmin ?? false;
-
-  async function sync() {
+  // Probije keš i učita najnovije iz Google Sheet-a (za sve na toj instanci).
+  async function refresh() {
     setBusy(true);
     setResult(null);
     setError(null);
     try {
-      const headers: Record<string, string> = {};
-      if (!isAdmin) {
-        localStorage.setItem('sync_secret', secret);
-        headers['x-sync-secret'] = secret;
-      }
-      const res = await fetch('/api/sync', { method: 'POST', headers });
+      const res = await fetch('/api/cards/due?fresh=1');
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Greška');
-      setResult(
-        `Sinhronizovano: ${data.cards} kartica, ${data.groupTags} grupa-oznaka, ${data.settings} podešavanja.`,
-      );
+      setResult(`Učitano iz Sheet-a: ${data.stats?.total ?? 0} kartica.`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Greška');
     } finally {
@@ -71,42 +60,23 @@ export default function AdminPage() {
           <h1 className="text-2xl font-bold text-ulum-blue">Admin</h1>
         </div>
         <p className="text-ulum-ink/60 text-sm mb-8">
-          Sinhronizacija kartica iz Google Sheet-a u bazu.
+          Kartice se uređuju u Google Sheet-u i čitaju uživo — nema sinhronizacije u bazu.
         </p>
 
         <div className="rounded-2xl bg-white shadow-sm p-6">
-          {isAdmin ? (
-            <p className="text-sm text-ulum-ink/70 mb-4">
-              Ulogovan kao <span className="font-semibold text-ulum-ink">{me?.name ?? 'admin'}</span>{' '}
-              <span className="text-[11px] px-1.5 py-0.5 rounded bg-ulum-blue/10 text-ulum-blue font-semibold">
-                admin
-              </span>
-              . Tajna nije potrebna.
-            </p>
-          ) : (
-            <>
-              <label className="block text-sm font-medium text-ulum-ink/70 mb-2">Sync tajna</label>
-              <input
-                type="password"
-                value={secret}
-                onChange={(e) => setSecret(e.target.value)}
-                placeholder="SYNC_SECRET"
-                className="w-full px-3 py-2.5 rounded-lg bg-ulum-paper border border-ulum-cream outline-none focus:border-ulum-green mb-4"
-              />
-              <p className="text-xs text-ulum-ink/50 mb-4">
-                Nisi prepoznat kao admin. Uđi iz Moodle-a kao instruktor, ili unesi tajnu.
-              </p>
-            </>
-          )}
-
+          <h2 className="text-sm font-semibold text-ulum-blue mb-1">Uređivanje kartica</h2>
+          <p className="text-xs text-ulum-ink/60 mb-4">
+            Menjaš reči, lekcije i pristup grupa direktno u <strong>CardsV2</strong> tabu Google
+            Sheet-a. Izmene se studentima vide u roku od ~5 minuta, ili odmah kad neko klikne
+            „Osveži iz Sheet-a“.
+          </p>
           <button
-            onClick={sync}
-            disabled={busy || (!isAdmin && !secret)}
+            onClick={refresh}
+            disabled={busy}
             className="w-full py-3 rounded-xl bg-ulum-green text-white font-medium hover:bg-ulum-green-dark disabled:opacity-50 transition-colors"
           >
-            {busy ? 'Sinhronizacija…' : 'Pokreni Sync'}
+            {busy ? 'Učitavanje…' : 'Osveži iz Sheet-a'}
           </button>
-
           {result && <p className="mt-4 text-ulum-green-dark text-sm">{result}</p>}
           {error && <p className="mt-4 text-ulum-pink text-sm">{error}</p>}
         </div>
@@ -162,7 +132,7 @@ export default function AdminPage() {
         )}
 
         <p className="text-ulum-ink/40 text-xs mt-4">
-          Sync prepisuje kartice i podešavanja iz Sheet-a; napredak studenata ostaje netaknut.
+          Napredak studenata živi u bazi i vezan je za sadržaj kartice (front+back).
         </p>
       </div>
     </main>

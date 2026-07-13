@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .playwright-mcp/
+
+# Google service account for gsheets MCP (local only)
+.gsheets-sa.json

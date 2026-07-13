@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 interface Card {
-  id: number;
+  key: string;
   front: string;
   back: string;
   lesson: string;
@@ -57,8 +57,6 @@ export default function StudyPage() {
   const [name, setName] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showBack, setShowBack] = useState(false);
@@ -66,12 +64,12 @@ export default function StudyPage() {
   const [done, setDone] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (fresh = false) => {
     setLoading(true);
     setError(null);
     setShowBack(false);
     try {
-      const res = await fetch('/api/cards/due');
+      const res = await fetch(`/api/cards/due${fresh ? '?fresh=1' : ''}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Greška');
       setQueue(data.cards);
@@ -99,7 +97,7 @@ export default function StudyPage() {
       const res = await fetch('/api/review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: card.id, rating }),
+        body: JSON.stringify({ cardKey: card.key, rating }),
       });
       if (!res.ok) {
         const d = await res.json();
@@ -113,22 +111,6 @@ export default function StudyPage() {
       setError(e instanceof Error ? e.message : 'Greška');
     } finally {
       setSubmitting(false);
-    }
-  }
-
-  async function adminSync() {
-    setSyncing(true);
-    setSyncMsg(null);
-    try {
-      const res = await fetch('/api/sync', { method: 'POST' });
-      const d = await res.json();
-      if (!res.ok) throw new Error(d.error ?? 'Greška');
-      setSyncMsg(`✓ ${d.cards} kartica, ${d.settings} podešavanja`);
-      await load();
-    } catch (e) {
-      setSyncMsg(e instanceof Error ? e.message : 'Greška');
-    } finally {
-      setSyncing(false);
     }
   }
 
@@ -173,14 +155,6 @@ export default function StudyPage() {
             <div className="absolute right-0 top-full mt-2 w-60 rounded-xl bg-white shadow-lg ring-1 ring-black/5 p-1.5 z-20 text-sm">
               {isAdmin && (
                 <>
-                  <button
-                    onClick={adminSync}
-                    disabled={syncing}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-ulum-cream disabled:opacity-50"
-                  >
-                    {syncing ? 'Sinhronizacija…' : '🔄 Sinhronizuj kartice'}
-                  </button>
-                  {syncMsg && <p className="px-3 py-1 text-xs text-ulum-green-dark">{syncMsg}</p>}
                   <a
                     href="/admin"
                     className="block px-3 py-2 rounded-lg hover:bg-ulum-cream text-ulum-ink"
@@ -193,11 +167,11 @@ export default function StudyPage() {
               <button
                 onClick={() => {
                   setMenuOpen(false);
-                  load();
+                  load(true);
                 }}
                 className="w-full text-left px-3 py-2 rounded-lg hover:bg-ulum-cream"
               >
-                ↻ Osveži kartice
+                ↻ Osveži iz Sheet-a
               </button>
               <a href="/" className="block px-3 py-2 rounded-lg hover:bg-ulum-cream text-ulum-ink">
                 🏠 Početna
@@ -275,7 +249,7 @@ export default function StudyPage() {
         <div className="mt-16 text-center">
           <p className="text-ulum-pink mb-4">{error}</p>
           <button
-            onClick={load}
+            onClick={() => load()}
             className="px-4 py-2 rounded-lg bg-ulum-blue text-white hover:bg-ulum-blue-dark"
           >
             Pokušaj ponovo
@@ -291,7 +265,7 @@ export default function StudyPage() {
             Odlično — ocenio si {done} {done === 1 ? 'karticu' : 'kartica'}. Vrati se sutra za nove.
           </p>
           <button
-            onClick={load}
+            onClick={() => load()}
             className="px-5 py-2.5 rounded-xl bg-ulum-green text-white font-medium hover:bg-ulum-green-dark"
           >
             Osveži
