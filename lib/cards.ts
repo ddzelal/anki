@@ -184,7 +184,7 @@ function lessonNum(lesson: string): number {
 export async function submitReview(userId: number, key: string, rating: Grade) {
   const cur = await pool.query(
     `select due, stability, difficulty, elapsed_days, scheduled_days,
-            reps, lapses, state, last_review
+            learning_steps, reps, lapses, state, last_review
      from public.anki_reviews where user_id = $1 and card_key = $2`,
     [userId, key],
   );
@@ -194,17 +194,17 @@ export async function submitReview(userId: number, key: string, rating: Grade) {
   await pool.query(
     `insert into public.anki_reviews
        (user_id, card_key, due, stability, difficulty, elapsed_days,
-        scheduled_days, reps, lapses, state, last_review)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+        scheduled_days, learning_steps, reps, lapses, state, last_review)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
      on conflict (user_id, card_key) do update set
        due = excluded.due, stability = excluded.stability,
        difficulty = excluded.difficulty, elapsed_days = excluded.elapsed_days,
-       scheduled_days = excluded.scheduled_days, reps = excluded.reps,
-       lapses = excluded.lapses, state = excluded.state,
+       scheduled_days = excluded.scheduled_days, learning_steps = excluded.learning_steps,
+       reps = excluded.reps, lapses = excluded.lapses, state = excluded.state,
        last_review = excluded.last_review`,
     [
       userId, key, next.due, next.stability, next.difficulty,
-      next.elapsed_days, next.scheduled_days, next.reps, next.lapses,
+      next.elapsed_days, next.scheduled_days, next.learning_steps, next.reps, next.lapses,
       next.state, next.last_review,
     ],
   );

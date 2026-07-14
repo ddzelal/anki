@@ -35,7 +35,7 @@ Pages: `/` landing, `/study` (flashcards + name + progress card with stats: Ukup
 - **Project:** `apwwevsyealtsnywwzak` (shared — we hit the Supabase project limit; also hosts a courts/booking app).
 - **Our app tables:** in `public`, prefixed `anki_` (visible in Table Editor). Only **three** — cards/groups/settings live in the Sheet now, not the DB:
   - `anki_users` (moodle_sub, display_name)
-  - `anki_reviews` (FSRS state per user/card, keyed by `(user_id, card_key)`; `card_key` = hash of `front+back` from `lib/cardkey.ts`; `introduced_at` = when a card was first seen, used for the daily new-card limit)
+  - `anki_reviews` (FSRS state per user/card, keyed by `(user_id, card_key)`; `card_key` = hash of `front+back` from `lib/cardkey.ts`; `introduced_at` = when a card was first seen, used for the daily new-card limit). **Stores the full ts-fsrs `Card`, incl. `learning_steps`** (the position in the learning steps `1m`/`10m`). This column is REQUIRED: without it a card can't graduate Learning→Review and stays stuck at 10 min forever — dropping any ts-fsrs Card field silently breaks scheduling. Migration `scripts/add-learning-steps.ts`.
   - `anki_review_log` (one row per rating event, keyed by `(user_id, card_key)`; powers the day-streak)
   - All have **RLS enabled with no policies** → not reachable via the public PostgREST API. The server talks to them via direct Postgres connection (`DATABASE_URL` pooler), which bypasses RLS.
   - **Removed 2026-07-13:** `anki_cards`, `anki_card_groups`, `anki_settings` (migration `scripts/migrate-to-cardkey.ts` backfilled `card_key` from `anki_cards` then dropped them). Do NOT recreate — cards/groups/settings are Sheet-only.

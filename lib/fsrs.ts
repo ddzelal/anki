@@ -17,6 +17,7 @@ export type ReviewState = {
   difficulty: number;
   elapsed_days: number;
   scheduled_days: number;
+  learning_steps: number; // trenutna pozicija u koracima učenja (MORA se čuvati da kartica diplomira)
   reps: number;
   lapses: number;
   state: number;
@@ -31,6 +32,7 @@ export function reviewToFsrsCard(r: ReviewState | null, now: Date): FsrsCard {
     difficulty: r.difficulty,
     elapsed_days: r.elapsed_days,
     scheduled_days: r.scheduled_days,
+    learning_steps: r.learning_steps,
     reps: r.reps,
     lapses: r.lapses,
     state: r.state as State,
@@ -60,6 +62,7 @@ export function schedule(
     difficulty: next.difficulty,
     elapsed_days: next.elapsed_days,
     scheduled_days: next.scheduled_days,
+    learning_steps: next.learning_steps,
     reps: next.reps,
     lapses: next.lapses,
     state: next.state,
