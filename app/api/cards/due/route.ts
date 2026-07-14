@@ -23,7 +23,10 @@ export async function GET(req: Request) {
     const user = await resolveUser(token);
 
     const deck = await getDeck(fresh);
-    const groupFilter = GROUPS_ENABLED && !user.isDev ? user.groups : null;
+    // Model B filtriranje samo za prave studente. Admin i dev (bez sesije) vide SVE
+    // (preview/lokalni rad) — inače bi nastavnik u nijednoj grupi video prazno.
+    const groupFilter =
+      GROUPS_ENABLED && !user.isDev && !user.isAdmin ? user.groups : null;
     const visible = filterVisible(deck.cards, groupFilter);
 
     const study = await buildStudy(user.userId, visible, newPerDay(deck.settings));

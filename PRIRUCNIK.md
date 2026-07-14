@@ -19,8 +19,7 @@ Svaki red = jedna kartica. Kolone:
 | `front` | Prednja strana kartice (npr. arapska reč) |
 | `back` | Poleđina — prevod / odgovor |
 | `lesson` | Oznaka lekcije, npr. `Lekcija 1`. Ako ostaviš prazno, red **nasleđuje** lekciju iz reda iznad |
-| `isActive` | `TRUE` ili prazno = kartica se prikazuje. `FALSE` = privremeno sakrivena **svima** (isključi bez brisanja) |
-| kolone za grupe (od kolone **E** nadalje) | Svaka kolona je jedna Moodle grupa. **Ime kolone (red 1) mora biti tačno ime grupe iz Moodle-a.** Kvačica ✓ u ćeliji = ta reč je vidljiva toj grupi |
+| kolone za grupe (od kolone **D** nadalje) | Svaka kolona je jedna Moodle grupa. **Ime kolone (red 1) mora biti tačno ime grupe iz Moodle-a.** Kvačica ✓ u ćeliji = ta reč je vidljiva toj grupi |
 
 > 💡 Za dodavanje reči samo dopiši nove redove. Za novu grupu — dodaj novu kolonu i u red 1
 > upiši ime grupe. (Ako nova kolona nema kvačice-widget, javi IT-ju da pokrene `pnpm checkboxes` — jednom.)
@@ -29,15 +28,17 @@ Svaki red = jedna kartica. Kolone:
 
 ## 2. NAJVAŽNIJE pravilo: ko vidi koju reč
 
-Student vidi reč ako je **aktivna** (`isActive`) **I** važi jedno od:
+**Student vidi reč SAMO ako je ta reč čekirana ✓ za neku grupu u kojoj je taj student.**
 
-- ✅ **Nijedna grupa nije čekirana** za tu reč → vidljiva je **svima** (nema ograničenja)
-- ✅ Student je **u nekoj grupi koja JE čekirana** za tu reč
-- ❌ Reč je čekirana **samo** za grupe u kojima student **nije** → **ne vidi je**
+- ✅ Reč čekirana za grupu `arapski_jezik_decembar_2025` → vide je **samo** članovi te grupe
+- ❌ Reč **bez ijedne kvačice** → **NIKO je ne vidi**
+- ❌ Reč čekirana samo za grupu u kojoj student **nije** → **ne vidi je**
 
-**Primeri:**
-- Red bez ijedne kvačice → svi ga uče.
-- Red sa kvačicom samo u koloni `arapski_jezik_decembar_2025` → uče ga **samo** članovi te grupe.
+> ⚠️ **Zato svaki student mora biti u nekoj grupi, i reči moraju biti čekirane za tu grupu** —
+> inače taj student ne vidi ništa. Prazna kolona = niko ne uči tu reč.
+
+**Primer:** ako `arapski_jezik_decembar_2025` cohort treba da uči Lekcije 1–5, čekiraj sve te reči
+u koloni `arapski_jezik_decembar_2025`. (Selektuj ćelije u toj koloni pa ih sve zakači odjednom.)
 
 ---
 

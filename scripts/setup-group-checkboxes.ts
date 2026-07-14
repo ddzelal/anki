@@ -37,12 +37,14 @@ async function main() {
   });
   const header = headerRes.data.values?.[0] ?? [];
 
-  // Grupne kolone = indeks >= 4 (kolona E) sa nepraznim imenom.
+  // Grupne kolone = sve NErezervisane kolone sa nepraznim zaglavljem (prepoznaje po imenu,
+  // ne po poziciji — radi i ako je `isActive` kolona obrisana).
+  const RESERVED = new Set(['front', 'back', 'lesson', 'isactive']);
   const groupCols: { idx: number; name: string }[] = [];
-  for (let i = 4; i < header.length; i++) {
-    const name = (header[i] ?? '').toString().trim();
-    if (name) groupCols.push({ idx: i, name });
-  }
+  header.forEach((h, i) => {
+    const name = (h ?? '').toString().trim();
+    if (name && !RESERVED.has(name.toLowerCase())) groupCols.push({ idx: i, name });
+  });
 
   if (groupCols.length === 0) {
     console.log('Nema grupnih kolona (E+). Dodaj ime grupe u zaglavlje pa pokreni ponovo.');
