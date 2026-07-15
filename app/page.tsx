@@ -13,18 +13,12 @@ export default function Home() {
         <p className="text-ulum-ink/60 mb-1">Ulum Academy — uči arapski jezik karticama</p>
         <p className="text-ulum-ink/40 text-sm mb-8">Spaced repetition (FSRS) · LTI za Moodle</p>
 
-        <div className="flex gap-3 justify-center">
+        <div className="flex justify-center">
           <Link
             href="/study"
             className="px-6 py-3 rounded-xl bg-ulum-blue text-white font-medium hover:bg-ulum-blue-dark transition-colors"
           >
             Počni učenje
-          </Link>
-          <Link
-            href="/admin"
-            className="px-6 py-3 rounded-xl bg-white text-ulum-blue font-medium border border-ulum-blue/20 hover:bg-ulum-cream transition-colors"
-          >
-            Admin
           </Link>
         </div>
       </div>
